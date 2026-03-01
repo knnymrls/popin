@@ -182,7 +182,10 @@ type ProfileData = {
   notes?: string;
 };
 
-function buildSystemPrompt(profile: ProfileData | null): string {
+function buildSystemPrompt(
+  profile: ProfileData | null,
+  friendProfiles?: ProfileData[]
+): string {
   let prompt = `You are Popin — the friend who always knows where to go. Not a search engine. Not an assistant. You're the homie with opinions.
 
 ${getTimeContext()}
@@ -273,6 +276,40 @@ NO PROFILE LOADED — you don't know this person's preferences yet. That's fine.
 - Default to mid-range budget ($-$$)
 - Pick based on time of day and what's popular
 - Still don't ask a bunch of questions. Just recommend something good.`;
+  }
+
+  // Inject friend context for group planning
+  if (friendProfiles && friendProfiles.length > 0) {
+    prompt += `
+
+GROUP PLANNING MODE — This person is planning with friends. You need to find spots that work for EVERYONE.
+
+FRIENDS IN THE GROUP:`;
+    for (const friend of friendProfiles) {
+      const lines = [];
+      lines.push(`  Name: ${friend.name}`);
+      if (friend.budget) lines.push(`  Budget: ${friend.budget}`);
+      if (friend.vibes.length)
+        lines.push(`  Vibes: ${friend.vibes.join(", ")}`);
+      if (friend.foodLoves.length)
+        lines.push(`  Loves: ${friend.foodLoves.join(", ")}`);
+      if (friend.foodAvoids.length)
+        lines.push(`  Avoids: ${friend.foodAvoids.join(", ")}`);
+      if (friend.activities.length)
+        lines.push(`  Into: ${friend.activities.join(", ")}`);
+      if (friend.dealbreakers.length)
+        lines.push(`  Dealbreakers: ${friend.dealbreakers.join(", ")}`);
+      prompt += `\n${lines.join("\n")}`;
+    }
+
+    prompt += `
+
+GROUP RULES:
+- Find spots everyone can enjoy. Look for OVERLAP in vibes and food loves.
+- NEVER recommend anything on ANYONE's avoids list or dealbreakers.
+- Use the LOWEST budget in the group as your ceiling (cheap beats moderate beats splurge).
+- When making plans, mention why it works for the group: "this works for you and Maya because..."
+- If preferences conflict (one loves sushi, another avoids it), pick something else entirely. Don't compromise — find common ground.`;
   }
 
   return prompt;
@@ -461,6 +498,7 @@ export const chat = action({
     userId: v.optional(v.string()),
     latitude: v.number(),
     longitude: v.number(),
+    friendIds: v.optional(v.array(v.string())),
   },
   handler: async (
     ctx,
@@ -484,7 +522,19 @@ export const chat = action({
       });
     }
 
-    const systemPrompt = buildSystemPrompt(profile);
+    // Load friend profiles for group planning
+    let friendProfiles: ProfileData[] | undefined;
+    if (args.userId && args.friendIds && args.friendIds.length > 0) {
+      const friends = await ctx.runQuery(
+        internal.friends.getFriendsWithProfilesInternal,
+        { userId: args.userId, friendIds: args.friendIds }
+      );
+      if (friends && friends.length > 0) {
+        friendProfiles = friends as ProfileData[];
+      }
+    }
+
+    const systemPrompt = buildSystemPrompt(profile, friendProfiles);
 
     // Convert messages to Anthropic format
     const claudeMessages: Anthropic.MessageParam[] = args.messages.map((m) => ({

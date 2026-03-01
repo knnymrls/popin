@@ -1,37 +1,27 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @Binding var selectedTab: AppTab
+
     var body: some View {
-        TabView {
-            Tab("Explore", systemImage: "magnifyingglass") {
+        TabView(selection: $selectedTab) {
+            Tab("Explore", systemImage: "magnifyingglass", value: .explore) {
                 ExploreView()
             }
 
-            Tab("Lists", systemImage: "rectangle.stack") {
-                PlaceholderTab(title: "Lists", icon: "rectangle.stack")
+            Tab("Friends", systemImage: "person.2", value: .friends) {
+                FriendsListView()
             }
 
-            Tab("Profile", systemImage: "person.crop.circle") {
+            Tab("Profile", systemImage: "person.crop.circle", value: .profile) {
                 ProfileView()
             }
         }
     }
 }
 
-private struct PlaceholderTab: View {
-    let title: String
-    let icon: String
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                Image(systemName: icon)
-                    .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
-                Text(title)
-                    .font(.title2.bold())
-            }
-            .navigationTitle(title)
-        }
-    }
+enum AppTab: Hashable {
+    case explore
+    case friends
+    case profile
 }

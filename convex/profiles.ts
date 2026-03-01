@@ -5,6 +5,8 @@ export const upsert = mutation({
   args: {
     userId: v.string(),
     name: v.string(),
+    phoneNumber: v.optional(v.string()),
+    avatarEmoji: v.optional(v.string()),
     budget: v.optional(v.string()),
     vibes: v.array(v.string()),
     foodLoves: v.array(v.string()),
@@ -22,6 +24,8 @@ export const upsert = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         name: args.name,
+        phoneNumber: args.phoneNumber,
+        avatarEmoji: args.avatarEmoji,
         budget: args.budget,
         vibes: args.vibes,
         foodLoves: args.foodLoves,

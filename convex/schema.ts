@@ -35,6 +35,8 @@ export default defineSchema({
   profiles: defineTable({
     userId: v.string(),
     name: v.string(),
+    phoneNumber: v.optional(v.string()),
+    avatarEmoji: v.optional(v.string()),
     budget: v.optional(v.string()),
     vibes: v.array(v.string()),
     foodLoves: v.array(v.string()),
@@ -42,7 +44,9 @@ export default defineSchema({
     activities: v.array(v.string()),
     dealbreakers: v.array(v.string()),
     notes: v.optional(v.string()),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_phone", ["phoneNumber"]),
 
   // Saved spots (favorites)
   favorites: defineTable({
@@ -83,4 +87,42 @@ export default defineSchema({
     suggestedTime: v.optional(v.string()),
     notes: v.optional(v.string()),
   }).index("by_plan", ["planId"]),
+
+  // Friendships between users
+  friendships: defineTable({
+    requesterId: v.string(),
+    addresseeId: v.string(),
+    status: v.string(), // "pending" | "accepted" | "declined"
+    createdAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+  })
+    .index("by_requester", ["requesterId"])
+    .index("by_addressee", ["addresseeId"])
+    .index("by_pair", ["requesterId", "addresseeId"]),
+
+  // Shared plans between friends
+  sharedPlans: defineTable({
+    planId: v.id("plans"),
+    senderId: v.string(),
+    recipientId: v.string(),
+    shareType: v.string(), // "hangout" | "recommendation"
+    message: v.optional(v.string()),
+    rsvp: v.string(), // "pending" | "accepted" | "declined"
+    createdAt: v.number(),
+  })
+    .index("by_recipient", ["recipientId"])
+    .index("by_sender", ["senderId"])
+    .index("by_plan", ["planId"]),
+
+  // SMS invites with deep link codes
+  invites: defineTable({
+    inviterId: v.string(),
+    inviteCode: v.string(),
+    inviteePhone: v.optional(v.string()),
+    claimedByUserId: v.optional(v.string()),
+    status: v.string(), // "sent" | "claimed"
+    createdAt: v.number(),
+  })
+    .index("by_code", ["inviteCode"])
+    .index("by_inviter", ["inviterId"]),
 });
