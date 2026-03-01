@@ -6,6 +6,7 @@ export const add = mutation({
     userId: v.string(),
     name: v.string(),
     address: v.string(),
+    photoUrl: v.optional(v.string()),
     priceLevel: v.optional(v.number()),
     rating: v.optional(v.number()),
     types: v.array(v.string()),

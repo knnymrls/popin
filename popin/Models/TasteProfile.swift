@@ -7,6 +7,7 @@ struct TasteProfile: Decodable, Identifiable {
     let name: String
     let phoneNumber: String?
     let avatarEmoji: String?
+    let profileImageUrl: String?
     let budget: String?
     let vibes: [String]
     let foodLoves: [String]

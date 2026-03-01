@@ -9,6 +9,7 @@ struct FriendRequest: Decodable, Identifiable {
     @ConvexFloat var createdAt: Double
     let requesterName: String?
     let requesterEmoji: String?
+    let requesterImageUrl: String?
 
     var id: String { _id }
 
@@ -24,6 +25,7 @@ struct OutgoingRequest: Decodable, Identifiable {
     @ConvexFloat var createdAt: Double
     let addresseeName: String?
     let addresseeEmoji: String?
+    let addresseeImageUrl: String?
 
     var id: String { _id }
 

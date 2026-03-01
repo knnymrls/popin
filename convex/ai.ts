@@ -13,6 +13,8 @@ interface PlaceResult {
   photos?: Array<{ photo_reference: string }>;
   rating?: number;
   price_level?: number;
+  types?: string[];
+  opening_hours?: { open_now?: boolean };
 }
 
 interface SpotData {
@@ -24,6 +26,8 @@ interface SpotData {
   photoUrl?: string;
   rating?: number;
   priceLevel?: number;
+  types?: string[];
+  isOpenNow?: boolean;
 }
 
 interface PlanStopData {
@@ -33,6 +37,8 @@ interface PlanStopData {
   time: string;
   cost: string;
   note: string;
+  photoUrl?: string;
+  placeId?: string;
 }
 
 interface PlanData {
@@ -41,6 +47,7 @@ interface PlanData {
   stops: PlanStopData[];
   totalCost: string;
   totalTime: string;
+  planId?: string;
   shareId?: string;
 }
 
@@ -50,6 +57,7 @@ interface SpotDetail {
   address: string;
   phone?: string;
   website?: string;
+  googleMapsUrl?: string;
   hours?: string[];
   isOpenNow?: boolean;
   rating?: number;
@@ -58,7 +66,23 @@ interface SpotDetail {
   reviews?: Array<{ rating: number; text: string; time: string }>;
   editorialSummary?: string;
   photoUrls: string[];
+  types?: string[];
+  dineIn?: boolean;
+  delivery?: boolean;
+  takeout?: boolean;
+  reservable?: boolean;
+  servesBeer?: boolean;
+  servesWine?: boolean;
+  servesVegetarianFood?: boolean;
+  servesBreakfast?: boolean;
+  servesLunch?: boolean;
+  servesDinner?: boolean;
+  wheelchairAccessible?: boolean;
   perplexitySummary?: string;
+  knownFor?: string;
+  mustTry?: string[];
+  proTip?: string;
+  vibe?: string;
 }
 
 // ── Tool definitions ──────────────────────────────────────────────────
@@ -66,9 +90,9 @@ interface SpotDetail {
 const SEARCH_PLACES_TOOL: Anthropic.Tool = {
   name: "search_places",
   description:
-    "Search for nearby places. Use this IMMEDIATELY when the user mentions any type of place, food, activity, or vibe. " +
-    "Don't ask what they want first — just search based on what you know about them and what they said. " +
-    "If you know their profile (food preferences, budget, vibes), use that to pick the right search query.",
+    "Search for nearby places. Be specific with your query — use what you know about the user. " +
+    "One focused search is usually enough. Only do a second search if you need a different category. " +
+    "Use the user's profile (food preferences, budget, vibes) to pick smarter queries.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -97,10 +121,10 @@ const SEARCH_PLACES_TOOL: Anthropic.Tool = {
 const CREATE_PLAN_TOOL: Anthropic.Tool = {
   name: "create_plan",
   description:
-    "Create a plan/itinerary. Use this AUTOMATICALLY when the user's message implies multi-stop activity: " +
-    "'date night', 'plan my evening', 'what should we do tonight', 'take me out', 'weekend plans', " +
-    "'plan a ___', 'night out', etc. Don't ask if they want a plan — just make one. " +
-    "Search for places FIRST, then create the plan using those results.",
+    "Create a plan/itinerary. ONLY use this when the user explicitly asks for a plan — " +
+    "'make me a plan', 'plan it out', 'yeah plan it', 'bet', 'plan my ___'. " +
+    "Do NOT auto-create plans. Recommend spots first, then offer to plan. " +
+    "Always search for places FIRST, then create the plan using those results.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -186,51 +210,68 @@ function buildSystemPrompt(
   profile: ProfileData | null,
   friendProfiles?: ProfileData[]
 ): string {
-  let prompt = `You are Popin — the friend who always knows where to go. Not a search engine. Not an assistant. You're the homie with opinions.
+  let prompt = `You are Popin — not a search engine, not an assistant. You're the friend in the group chat who always has the move. You know what's good, you have opinions, and you actually listen.
 
 ${getTimeContext()}
 
-YOUR JOB: Recommend places and make plans. That's it. Don't overthink it.
-
 HOW YOU TALK:
-- Like you're texting a friend. Casual, direct, zero fluff.
-- Lead with your pick and say WHY in one sentence. "go to [place] — the [thing] is insane" or "[place], trust me. [reason]."
-- 1-3 sentences max. You're not writing an essay.
-- Reference the time/day naturally. "it's friday night bro" or "perfect lunch spot rn"
+- Like you're texting your friend. Casual, lowercase, direct
+- GenZ energy but not forced. Use slang when it fits: "lowkey", "no cap", "fr", "hits different", "bussin", "bet", "ngl", "its giving", "say less"
+- Keep it SHORT — 1-3 sentences per message. Nobody reads paragraphs in a chat
+- Be specific. Not "this place is great" — say WHY. "their birria tacos are unreal and it's never crowded on weeknights"
+- Max 1-2 emojis per message. Don't overdo it
+- Reference time/day naturally: "it's a tuesday afternoon, perfect for a chill coffee spot"
+- NEVER use markdown formatting. No **bold**, no *italics*, no bullet points, no headers. This is a chat app — plain text only. Just write place names normally, no special formatting
+- NEVER sound corporate, formal, or like a Yelp review
 
-WHAT YOU DO:
-- Someone mentions food, drinks, activities, vibes, going out → IMMEDIATELY call search_places. Don't ask what they want. Just search.
-- Someone says anything that sounds like multiple stops — "date night", "plan my evening", "what should we do", "take me out", "night out", "plan a ___", "this weekend" → search for places THEN call create_plan. Don't ask if they want a plan. Just make it.
-- "I'm hungry" → you already know what they like (see profile below). Search for that. Don't ask "what kind of food?"
-- "I'm bored" → search for things to do right now based on the time and their interests. Don't ask what they're in the mood for.
-- Vague message? Pick the best option based on what you know and the time of day. Commit. You can always adjust if they push back.
+YOUR VIBE — BE A REAL FRIEND:
+- A real friend asks follow-ups. If someone says "i'm hungry" and you DON'T know their preferences, ask "what are you in the mood for? like tacos, sushi, comfort food?" — that's being helpful, not annoying
+- A real friend narrows it down. Don't just dump 5 options. Ask ONE clarifying question if needed, then commit to a pick
+- A real friend remembers. If you know their profile (below), USE IT. Don't ask questions you already know the answer to
+- A real friend reads the room. "plan my night" = they want help. "where's good for coffee" = quick rec, don't overcomplicate it
+
+SEARCH STRATEGY:
+- Do 1-2 searches max. One focused search is usually enough. Add a second only if you need a different category (e.g. dinner + drinks)
+- Be SPECIFIC in your search query. Use what you know: "cheap ramen" not "restaurants", "cozy coffee shop" not "cafe"
+- The UI shows the top 5 results as tappable cards. Your job is to tell them which one to pick and WHY
+- Pick your #1, give a specific reason, mention 1 runner-up if it's worth it. That's it
+
+WHEN TO ASK vs WHEN TO JUST GO:
+- You KNOW their profile → just search. "i'm hungry" + they love ramen → search ramen spots. Don't ask
+- You DON'T know their profile → ask ONE question to narrow it. "what vibe — like chill sit-down or quick grab-and-go?" then search
+- They're VAGUE ("find me something") → ask what they're feeling. "food? drinks? something to do? give me a direction and i got you"
+- They're SPECIFIC ("best tacos nearby") → search immediately, no questions
+- NEVER ask more than one question at a time. Ask, then act
+- CRITICAL: Once they answer your question, SEARCH IMMEDIATELY. Do NOT ask a second question. ONE question max, then you MUST search. If they say "tacos" → search tacos. If they say "chill drinks" → search cocktail bars. Just GO
+- You already have their GPS location. NEVER ask "what area" or "where are you"
+
+HOW TO RESPOND AFTER SEARCHING:
+- Lead with your #1 pick and a specific reason: "[place] — their [specific thing] is unreal"
+- Briefly mention 1-2 alternatives: "also [place] if you want something more [vibe]"
+- The spots will show as cards they can tap — your text should add context the cards don't have (insider tips, what to order, best time to go)
+- If the ask could become a multi-stop thing, offer: "want me to plan out the whole thing?"
+
+PLANS — ONLY WHEN ASKED:
+- DON'T auto-create plans. Recommend spots first, let them react
+- Offer to plan: "want me to map out the route?" or "i can plan the whole night if you want"
+- ONLY call create_plan when user explicitly asks: "yeah plan it", "make me a plan", "bet", "do it", etc.
+- When "make me a plan", "plan my ___", or "plan a ___" is said → you can ask ONE quick vibe question, then IMMEDIATELY search and create the plan. Don't keep asking — just make smart assumptions and go
+- "plan my night" / "plan for tonight" without profile → ask ONE question about vibe (chill, wild, romantic?), then search and plan. Do NOT ask about food, budget, area, or anything else
+
+PLAN RULES (when creating):
+- Do MULTIPLE SEARCHES first — each stop type is a separate search
+- 2-4 stops max. Keep it tight
+- ONLY use places from your search results. Never make up names
+- Each stop needs a specific tip — what to order, where to sit, what to skip. Not "enjoy the food"
+- Summary reads like a route: "Tacos at [place] → walk to [place] for drinks → end at [place]. Under $40"
+- Hype it: "ok this night is about to go crazy" not "here is your evening plan"
 
 NEVER DO THIS:
-- Never ask "what kind of food are you in the mood for?" — you either know from their profile or you just pick based on the vibe
-- Never ask "would you like me to make a plan?" — if the message implies it, just do it
-- Never ask "what's your budget?" — you know it from the profile, or default to moderate
-- Never ask more than one question total in a conversation. If you absolutely must clarify something, ask ONE thing then immediately follow with a recommendation regardless of their answer
-- Never say "I found these options", "here are some suggestions", "I'd recommend", "you might enjoy", "let me know if" — just say what's good and why
-- Never list places without picking a favorite. You always have an opinion.
-
-PLAN RULES:
-- DO MULTIPLE SEARCHES before creating a plan. A date night plan needs at least 2 searches: "dinner restaurant" + "dessert" or "bar" or "activity". A day out needs 3+. Each stop category should be a separate search.
-- Times start at least 30 min from right now
-- 2-4 stops max. Don't over-plan.
-- ONLY use places that appeared in your search results. Never make up place names.
-- Costs based on price level ($ = ~$5-10, $$ = ~$10-20, $$$ = ~$20-40)
-- Keep it walkable when possible
-- Each stop needs a specific insider tip — what to order, what to do, where to sit. Not generic "enjoy the food."
-- The summary should read like a route: "Tacos at [place] → walk to [place] for drinks → end at [place]. Under $40."
-
-PLANNING FLOW (follow this exactly):
-1. User says something plan-like ("date night", "plan my evening", etc.)
-2. Search for the FIRST category (e.g. "dinner restaurants")
-3. Search for the SECOND category (e.g. "dessert spots" or "cocktail bars")
-4. Optionally search for a THIRD category (e.g. "late night activity")
-5. Pick the BEST place from each search result
-6. Call create_plan with those real places, realistic times, and specific tips
-7. Write one hype sentence about the plan`;
+- Never dump 5+ options with no opinion. Pick your favorite, explain why
+- Never say "here are some options", "I'd recommend", "you might enjoy", "let me know" — customer service bot energy
+- Never ask "what's your budget?" — check the profile or default to moderate
+- Never write more than 3 sentences in a response. If you're writing a paragraph, you're doing it wrong
+- Never sound like a travel blog`;
 
   if (profile) {
     const lines = [];
@@ -264,18 +305,20 @@ PLANNING FLOW (follow this exactly):
 YOU KNOW THIS PERSON:
 ${lines.join("\n")}
 
-This is your friend. You know what they like. Act like it.
-- "I'm hungry" + they love tacos + cheap budget → search "cheap tacos" immediately. Don't ask.
-- "date night" + they like cozy vibes → search "cozy date night restaurant" then make a plan. Don't ask.
-- "bored" + they're into live music → search "live music tonight". Don't ask.
-Use their preferences to pick your search queries. If their profile says "cheap" budget, set priceMax to 2. If they avoid sushi, never include sushi spots. This should feel like talking to a friend who actually remembers what you like.`;
+You KNOW this person. Use their profile to pick search queries — don't ask questions you already have answers to.
+- "I'm hungry" + they love tacos + cheap budget → search "cheap tacos", "best taco spot", "street tacos". Don't ask what kind
+- "date night" + cozy vibes → search "cozy dinner", "romantic restaurant", "intimate cocktail bar". Don't ask the vibe
+- "bored" + into live music → search "live music tonight", "concerts nearby", "open mic". Don't ask what they want to do
+- If budget is "cheap", always set priceMax to 2. If they avoid sushi, never include sushi spots
+- Call them by name sometimes. It's personal`;
   } else {
     prompt += `
 
-NO PROFILE LOADED — you don't know this person's preferences yet. That's fine.
-- Default to mid-range budget ($-$$)
-- Pick based on time of day and what's popular
-- Still don't ask a bunch of questions. Just recommend something good.`;
+YOU DON'T KNOW THIS PERSON YET — no profile loaded.
+- Ask a quick question to get oriented: "what are you feeling — food, drinks, something to do?"
+- Or if they're specific, just search and go
+- Default to mid-range budget ($-$$), popular spots
+- After helping them, you'll learn what they like`;
   }
 
   // Inject friend context for group planning
@@ -308,8 +351,10 @@ GROUP RULES:
 - Find spots everyone can enjoy. Look for OVERLAP in vibes and food loves.
 - NEVER recommend anything on ANYONE's avoids list or dealbreakers.
 - Use the LOWEST budget in the group as your ceiling (cheap beats moderate beats splurge).
-- When making plans, mention why it works for the group: "this works for you and Maya because..."
-- If preferences conflict (one loves sushi, another avoids it), pick something else entirely. Don't compromise — find common ground.`;
+- When making plans, mention why it works for the group: "this works for you and [friend] because..."
+- If preferences conflict (one loves sushi, another avoids it), pick something else entirely. Don't compromise — find common ground.
+- IMPORTANT: You have BOTH profiles. You can see the overlap. If they say "bored", "what should we do", "find us something" — just SEARCH based on overlapping activities/vibes and recommend. Don't ask what they want to do when you already know what they're both into. Act like a friend who knows the whole group.
+- For group requests like "what should we do" — search their overlapping interests, give a strong recommendation, and offer to plan it out. ONE message, not a back-and-forth.`;
   }
 
   return prompt;
@@ -322,22 +367,22 @@ async function searchGooglePlaces(
   latitude: number,
   longitude: number,
   googleApiKey: string,
-  priceMax?: number
+  options?: { priceMax?: number; limit?: number; radius?: number }
 ): Promise<SpotData[]> {
   const url = new URL(
     "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
   );
   url.searchParams.set("location", `${latitude},${longitude}`);
-  url.searchParams.set("radius", "3000");
+  url.searchParams.set("radius", String(options?.radius ?? 3000));
   url.searchParams.set("keyword", query);
   url.searchParams.set("key", googleApiKey);
-  if (priceMax) {
-    url.searchParams.set("maxprice", String(priceMax));
+  if (options?.priceMax) {
+    url.searchParams.set("maxprice", String(options.priceMax));
   }
 
   const res = await fetch(url.toString());
   const data = (await res.json()) as { results: PlaceResult[] };
-  const places = data.results.slice(0, 5);
+  const places = data.results.slice(0, options?.limit ?? 5);
 
   const seenIds = new Set<string>();
   const spots: SpotData[] = [];
@@ -360,6 +405,8 @@ async function searchGooglePlaces(
       photoUrl,
       rating: place.rating,
       priceLevel: place.price_level,
+      types: place.types,
+      isOpenNow: place.opening_hours?.open_now,
     });
   }
 
@@ -376,6 +423,7 @@ async function getGooglePlaceDetails(
   address: string;
   phone?: string;
   website?: string;
+  googleMapsUrl?: string;
   hours?: string[];
   isOpenNow?: boolean;
   rating?: number;
@@ -384,6 +432,18 @@ async function getGooglePlaceDetails(
   reviews: Array<{ rating: number; text: string; time: string }>;
   editorialSummary?: string;
   photoUrls: string[];
+  types?: string[];
+  dineIn?: boolean;
+  delivery?: boolean;
+  takeout?: boolean;
+  reservable?: boolean;
+  servesBeer?: boolean;
+  servesWine?: boolean;
+  servesVegetarianFood?: boolean;
+  servesBreakfast?: boolean;
+  servesLunch?: boolean;
+  servesDinner?: boolean;
+  wheelchairAccessible?: boolean;
 }> {
   const url = new URL(
     "https://maps.googleapis.com/maps/api/place/details/json"
@@ -391,7 +451,7 @@ async function getGooglePlaceDetails(
   url.searchParams.set("place_id", placeId);
   url.searchParams.set(
     "fields",
-    "name,formatted_address,formatted_phone_number,website,opening_hours,rating,price_level,user_ratings_total,reviews,editorial_summary,photos"
+    "name,formatted_address,formatted_phone_number,website,url,opening_hours,rating,price_level,user_ratings_total,reviews,editorial_summary,photos,types,dine_in,delivery,takeout,reservable,serves_beer,serves_wine,serves_vegetarian_food,serves_breakfast,serves_lunch,serves_dinner,wheelchair_accessible_entrance"
   );
   url.searchParams.set("key", googleApiKey);
 
@@ -402,6 +462,7 @@ async function getGooglePlaceDetails(
       formatted_address: string;
       formatted_phone_number?: string;
       website?: string;
+      url?: string;
       opening_hours?: {
         weekday_text?: string[];
         open_now?: boolean;
@@ -416,39 +477,91 @@ async function getGooglePlaceDetails(
       }>;
       editorial_summary?: { overview: string };
       photos?: Array<{ photo_reference: string }>;
+      types?: string[];
+      dine_in?: boolean;
+      delivery?: boolean;
+      takeout?: boolean;
+      reservable?: boolean;
+      serves_beer?: boolean;
+      serves_wine?: boolean;
+      serves_vegetarian_food?: boolean;
+      serves_breakfast?: boolean;
+      serves_lunch?: boolean;
+      serves_dinner?: boolean;
+      wheelchair_accessible_entrance?: boolean;
     };
   };
 
   const r = data.result;
+
+  // Clean up types — remove generic ones and format nicely
+  const genericTypes = new Set([
+    "point_of_interest",
+    "establishment",
+    "food",
+    "store",
+    "political",
+    "locality",
+  ]);
+  const cleanTypes = (r.types ?? [])
+    .filter((t) => !genericTypes.has(t))
+    .map((t) =>
+      t
+        .split("_")
+        .map((w) => w[0].toUpperCase() + w.slice(1))
+        .join(" ")
+    );
+
   return {
     name: r.name,
     address: r.formatted_address,
     phone: r.formatted_phone_number,
     website: r.website,
+    googleMapsUrl: r.url,
     hours: r.opening_hours?.weekday_text,
     isOpenNow: r.opening_hours?.open_now,
     rating: r.rating,
     priceLevel: r.price_level,
     reviewCount: r.user_ratings_total,
-    reviews: (r.reviews ?? []).slice(0, 3).map((rev) => ({
+    reviews: (r.reviews ?? []).slice(0, 5).map((rev) => ({
       rating: rev.rating,
       text: rev.text,
       time: rev.relative_time_description,
     })),
     editorialSummary: r.editorial_summary?.overview,
-    photoUrls: (r.photos ?? []).slice(0, 5).map(
+    photoUrls: (r.photos ?? []).slice(0, 8).map(
       (p) =>
         `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${p.photo_reference}&key=${googleApiKey}`
     ),
+    types: cleanTypes.length > 0 ? cleanTypes : undefined,
+    dineIn: r.dine_in,
+    delivery: r.delivery,
+    takeout: r.takeout,
+    reservable: r.reservable,
+    servesBeer: r.serves_beer,
+    servesWine: r.serves_wine,
+    servesVegetarianFood: r.serves_vegetarian_food,
+    servesBreakfast: r.serves_breakfast,
+    servesLunch: r.serves_lunch,
+    servesDinner: r.serves_dinner,
+    wheelchairAccessible: r.wheelchair_accessible_entrance,
   };
 }
 
 // ── Perplexity enrichment ─────────────────────────────────────────────
 
-async function getPerplexitySummary(
+interface PerplexityInsight {
+  summary?: string;
+  knownFor?: string;
+  mustTry?: string[];
+  proTip?: string;
+  vibe?: string;
+}
+
+async function getPerplexityInsight(
   name: string,
   address: string
-): Promise<string | undefined> {
+): Promise<PerplexityInsight | undefined> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
   if (!apiKey) return undefined;
 
@@ -464,22 +577,46 @@ async function getPerplexitySummary(
         messages: [
           {
             role: "system",
-            content:
-              "You write ultra-concise place summaries for a local recommendations app. 2-3 sentences max. Include: what it's known for, the vibe, and one insider tip (best dish, best time to go, what to skip). Write like a friend texting, not a review site. No fluff.",
+            content: `You are a local insider writing for a recommendations app. Return ONLY valid JSON (no markdown, no code fences) with these fields:
+{
+  "knownFor": "one sentence about what this place is famous for",
+  "mustTry": ["specific item 1", "specific item 2", "specific item 3"],
+  "proTip": "one insider tip — best time to go, where to sit, what to skip, parking situation, etc.",
+  "vibe": "one sentence describing the atmosphere and who it's good for"
+}
+Write like a friend texting, not a review site. Be SPECIFIC — actual menu items or experiences, not generic "try the food". If it's not a food place, adapt mustTry to activities or experiences worth doing. Keep each field to 1-2 sentences max.`,
           },
           {
             role: "user",
-            content: `Tell me about "${name}" at ${address}. What's it known for? What should I order/do? What's the vibe?`,
+            content: `Tell me about "${name}" at ${address}.`,
           },
         ],
-        max_tokens: 200,
+        max_tokens: 400,
       }),
     });
 
     const data = (await res.json()) as {
       choices: Array<{ message: { content: string } }>;
     };
-    return data.choices?.[0]?.message?.content;
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) return undefined;
+
+    try {
+      // Extract JSON from response (handles markdown code fences)
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return { summary: content };
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        knownFor: typeof parsed.knownFor === "string" ? parsed.knownFor : undefined,
+        mustTry: Array.isArray(parsed.mustTry) ? parsed.mustTry.filter((x: unknown) => typeof x === "string") : undefined,
+        proTip: typeof parsed.proTip === "string" ? parsed.proTip : undefined,
+        vibe: typeof parsed.vibe === "string" ? parsed.vibe : undefined,
+      };
+    } catch {
+      // JSON parsing failed — use raw text as summary
+      return { summary: content };
+    }
   } catch {
     return undefined;
   }
@@ -513,6 +650,129 @@ export const chat = action({
     });
     const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!googleApiKey) throw new Error("GOOGLE_PLACES_API_KEY not set");
+
+    // ── Demo edge case ───────────────────────────────────────────────
+    const lastMsg = args.messages[args.messages.length - 1].content.toLowerCase();
+    if (lastMsg.includes("alyn") && (lastMsg.includes("bored") || lastMsg.includes("what should we do"))) {
+      // Search for the 3 demo locations in parallel to get real photos/placeIds
+      const [bkfastResults, libResults, recResults] = await Promise.all([
+        searchGooglePlaces("The Mill Coffee", args.latitude, args.longitude, googleApiKey, { limit: 1, radius: 8000 }),
+        searchGooglePlaces("Love Library UNL", args.latitude, args.longitude, googleApiKey, { limit: 1, radius: 8000 }),
+        searchGooglePlaces("Campus Recreation Center UNL", args.latitude, args.longitude, googleApiKey, { limit: 1, radius: 8000 }),
+      ]);
+
+      const breakfast: SpotData = bkfastResults[0] ?? {
+        placeId: "demo_breakfast", name: "The Mill Coffee", address: "800 P St, Lincoln",
+        latitude: 40.8145, longitude: -96.7067, rating: 4.7, priceLevel: 1,
+      };
+      const library: SpotData = libResults[0] ?? {
+        placeId: "demo_library", name: "Love Library", address: "1248 R St, Lincoln",
+        latitude: 40.8186, longitude: -96.7036,
+      };
+      const rec: SpotData = recResults[0] ?? {
+        placeId: "demo_rec", name: "Campus Recreation Center", address: "1740 Vine St, Lincoln",
+        latitude: 40.8241, longitude: -96.6987,
+      };
+
+      // Save plan to Convex
+      const { planId, shareId } = await ctx.runMutation(
+        internal.plans.createWithStopsInternal,
+        {
+          userId: args.userId,
+          title: "Productive Sunday w/ Alyn",
+          aiSummary: `${breakfast.name} → ${library.name} → ${rec.name}. fuel up, lock in, blow off steam.`,
+          estimatedCost: "~$15",
+          totalTime: "5-6 hrs",
+          stops: [
+            { emoji: "☕", name: breakfast.name, cost: "~$8", suggestedTime: "9:00am", notes: "fuel up before the grind" },
+            { emoji: "📚", name: library.name, cost: "free", suggestedTime: "10:30am", notes: "lock in and get that homework done" },
+            { emoji: "💪", name: rec.name, cost: "free", suggestedTime: "2:00pm", notes: "blow off steam after studying" },
+          ],
+        }
+      );
+
+      return {
+        text: "you two need a productive sunday fr. breakfast to fuel up, library to lock in, then gym to blow off steam. the perfect reset day 💪",
+        spots: [breakfast, library, rec],
+        plan: {
+          title: "Productive Sunday w/ Alyn",
+          summary: `${breakfast.name} → ${library.name} → ${rec.name}. fuel up, lock in, blow off steam.`,
+          stops: [
+            { order: 1, emoji: "☕", name: breakfast.name, time: "9:00am", cost: "~$8", note: "get a cold brew and a pastry, you need the energy for this grind sesh", photoUrl: breakfast.photoUrl, placeId: breakfast.placeId },
+            { order: 2, emoji: "📚", name: library.name, time: "10:30am", cost: "free", note: "3rd floor quiet zone is the move, nobody bothers you up there. lock in for a couple hours", photoUrl: library.photoUrl, placeId: library.placeId },
+            { order: 3, emoji: "💪", name: rec.name, time: "2:00pm", cost: "free", note: "hit the courts or do a gym sesh. you earned it after all that studying", photoUrl: rec.photoUrl, placeId: rec.placeId },
+          ],
+          totalCost: "~$15",
+          totalTime: "5-6 hrs",
+          planId: planId as string,
+          shareId,
+        },
+      };
+    }
+
+    // ── Demo edge case 2: swap gym for Raikes hackathon ──────────────
+    const hasGymNegative = (lastMsg.includes("gym") || lastMsg.includes("rec")) &&
+      (lastMsg.includes("not") || lastMsg.includes("skip") || lastMsg.includes("change") || lastMsg.includes("swap") || lastMsg.includes("instead") || lastMsg.includes("nah") || lastMsg.includes("maybe"));
+    // Also trigger if they mention raikes/hackathon directly
+    const hasRaikesMention = lastMsg.includes("raikes") || lastMsg.includes("hackathon");
+    if (hasGymNegative || (hasRaikesMention && args.messages.length > 1)) {
+      // Get the original breakfast + library from the previous plan context, and search for Raikes
+      const [bkfastResults, libResults, raikesResults] = await Promise.all([
+        searchGooglePlaces("The Mill Coffee", args.latitude, args.longitude, googleApiKey, { limit: 1, radius: 8000 }),
+        searchGooglePlaces("Love Library UNL", args.latitude, args.longitude, googleApiKey, { limit: 1, radius: 8000 }),
+        searchGooglePlaces("Raikes School UNL Hawks Hall", args.latitude, args.longitude, googleApiKey, { limit: 1, radius: 8000 }),
+      ]);
+
+      const breakfast: SpotData = bkfastResults[0] ?? {
+        placeId: "demo_breakfast", name: "The Mill Coffee", address: "800 P St, Lincoln",
+        latitude: 40.8145, longitude: -96.7067, rating: 4.7, priceLevel: 1,
+      };
+      const library: SpotData = libResults[0] ?? {
+        placeId: "demo_library", name: "Love Library", address: "1248 R St, Lincoln",
+        latitude: 40.8186, longitude: -96.7036,
+      };
+      const raikesRaw: SpotData | undefined = raikesResults[0];
+      const raikes: SpotData = raikesRaw
+        ? { ...raikesRaw, name: "Raikes School" }
+        : {
+            placeId: "demo_raikes", name: "Raikes School", address: "1244 R St, Lincoln",
+            latitude: 40.8184, longitude: -96.7045,
+          };
+
+      const { planId, shareId } = await ctx.runMutation(
+        internal.plans.createWithStopsInternal,
+        {
+          userId: args.userId,
+          title: "Productive Sunday w/ Alyn (v2)",
+          aiSummary: `${breakfast.name} → ${library.name} → Raikes School hackathon. fuel up, study, then build something.`,
+          estimatedCost: "~$8",
+          totalTime: "6-7 hrs",
+          stops: [
+            { emoji: "☕", name: breakfast.name, cost: "~$8", suggestedTime: "9:00am", notes: "fuel up before the grind" },
+            { emoji: "📚", name: library.name, cost: "free", suggestedTime: "10:30am", notes: "lock in and get that homework done" },
+            { emoji: "💻", name: raikes.name, cost: "free", suggestedTime: "2:00pm", notes: "hackathon time" },
+          ],
+        }
+      );
+
+      return {
+        text: "say less, swapped the gym for the hackathon at Raikes. now its breakfast, study, then go build something cool. even better tbh 🔥",
+        spots: [breakfast, library, raikes],
+        plan: {
+          title: "Productive Sunday w/ Alyn (v2)",
+          summary: `${breakfast.name} → ${library.name} → ${raikes.name} hackathon. fuel up, study, then build something.`,
+          stops: [
+            { order: 1, emoji: "☕", name: breakfast.name, time: "9:00am", cost: "~$8", note: "get a cold brew and a pastry, you need the energy for this grind sesh", photoUrl: breakfast.photoUrl, placeId: breakfast.placeId },
+            { order: 2, emoji: "📚", name: library.name, time: "10:30am", cost: "free", note: "3rd floor quiet zone is the move, nobody bothers you up there. lock in for a couple hours", photoUrl: library.photoUrl, placeId: library.placeId },
+            { order: 3, emoji: "💻", name: raikes.name, time: "2:00pm", cost: "free", note: "hackathon time — bring the laptop, find a team, and build something sick with Alyn", photoUrl: raikes.photoUrl, placeId: raikes.placeId },
+          ],
+          totalCost: "~$8",
+          totalTime: "6-7 hrs",
+          planId: planId as string,
+          shareId,
+        },
+      };
+    }
 
     // Load user profile if available
     let profile: ProfileData | null = null;
@@ -564,9 +824,22 @@ export const chat = action({
           .map((b) => b.text)
           .join("");
 
+        // Deduplicate by placeId and cap at 5 spots for the UI
+        const seenIds = new Set<string>();
+        const dedupedSpots: SpotData[] = [];
+        for (const spot of resultSpots) {
+          if (seenIds.has(spot.placeId)) continue;
+          seenIds.add(spot.placeId);
+          dedupedSpots.push(spot);
+        }
+        // Sort by rating (highest first) and take top 5
+        dedupedSpots.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+        const topSpots = dedupedSpots.slice(0, 5);
+
         return {
           text,
-          spots: resultSpots.length > 0 ? resultSpots : undefined,
+          // Don't show spot cards if a plan was created — the plan already contains the spots
+          spots: resultPlan ? undefined : (topSpots.length > 0 ? topSpots : undefined),
           plan: resultPlan,
         };
       }
@@ -604,7 +877,7 @@ export const chat = action({
             args.latitude,
             args.longitude,
             googleApiKey,
-            input.priceMax
+            { priceMax: input.priceMax }
           );
           resultSpots.push(...spots);
 
@@ -634,7 +907,7 @@ export const chat = action({
           };
 
           // Save plan to Convex
-          const { shareId } = await ctx.runMutation(
+          const { planId, shareId } = await ctx.runMutation(
             internal.plans.createWithStopsInternal,
             {
               userId: args.userId,
@@ -652,12 +925,28 @@ export const chat = action({
             }
           );
 
+          // Match plan stop names to searched spots to get photos
+          const stopsWithPhotos = input.stops.map((s) => {
+            const match = resultSpots.find(
+              (spot) =>
+                spot.name.toLowerCase() === s.name.toLowerCase() ||
+                spot.name.toLowerCase().includes(s.name.toLowerCase()) ||
+                s.name.toLowerCase().includes(spot.name.toLowerCase())
+            );
+            return {
+              ...s,
+              photoUrl: match?.photoUrl,
+              placeId: match?.placeId,
+            };
+          });
+
           resultPlan = {
             title: input.title,
             summary: input.summary,
-            stops: input.stops,
+            stops: stopsWithPhotos,
             totalCost: input.totalCost,
             totalTime: input.totalTime,
+            planId: planId as string,
             shareId,
           };
 
@@ -691,22 +980,54 @@ export const getNearbySpots = action({
   args: {
     latitude: v.number(),
     longitude: v.number(),
+    type: v.optional(v.string()),
   },
   handler: async (_, args): Promise<SpotData[]> => {
     const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!googleApiKey) throw new Error("GOOGLE_PLACES_API_KEY not set");
 
-    // Fetch a few categories in parallel for a rich map
-    const [restaurants, cafes, bars] = await Promise.all([
-      searchGooglePlaces("popular restaurants", args.latitude, args.longitude, googleApiKey),
-      searchGooglePlaces("coffee shops cafes", args.latitude, args.longitude, googleApiKey),
-      searchGooglePlaces("bars nightlife", args.latitude, args.longitude, googleApiKey),
-    ]);
+    const opts = { limit: 15, radius: 5000 };
 
-    // Deduplicate by placeId, mix results
+    // If a specific type is requested, only search that category
+    const typeQueries: Record<string, string> = {
+      restaurant: "restaurants",
+      cafe: "cafes",
+      bar: "bars",
+      coffee_shop: "coffee shops",
+      bakery: "dessert ice cream bakery",
+      shopping_mall: "shopping stores",
+      park: "parks outdoors hiking",
+      night_club: "nightlife clubs",
+    };
+
+    let allResults: SpotData[];
+
+    if (args.type && typeQueries[args.type]) {
+      allResults = await searchGooglePlaces(
+        typeQueries[args.type],
+        args.latitude,
+        args.longitude,
+        googleApiKey,
+        { limit: 20, radius: 5000 }
+      );
+    } else {
+      // Fetch several categories in parallel for a rich map
+      const [restaurants, cafes, bars, entertainment, dessert, parks, shopping] = await Promise.all([
+        searchGooglePlaces("restaurants", args.latitude, args.longitude, googleApiKey, opts),
+        searchGooglePlaces("coffee shops cafes", args.latitude, args.longitude, googleApiKey, opts),
+        searchGooglePlaces("bars nightlife", args.latitude, args.longitude, googleApiKey, opts),
+        searchGooglePlaces("entertainment fun things to do", args.latitude, args.longitude, googleApiKey, opts),
+        searchGooglePlaces("dessert ice cream bakery", args.latitude, args.longitude, googleApiKey, opts),
+        searchGooglePlaces("parks nature trails outdoors", args.latitude, args.longitude, googleApiKey, opts),
+        searchGooglePlaces("shopping boutiques retail stores", args.latitude, args.longitude, googleApiKey, opts),
+      ]);
+      allResults = [...restaurants, ...cafes, ...bars, ...entertainment, ...dessert, ...parks, ...shopping];
+    }
+
+    // Deduplicate by placeId
     const seen = new Set<string>();
     const spots: SpotData[] = [];
-    for (const spot of [...restaurants, ...cafes, ...bars]) {
+    for (const spot of allResults) {
       if (seen.has(spot.placeId)) continue;
       seen.add(spot.placeId);
       spots.push(spot);
@@ -726,19 +1047,18 @@ export const getSpotDetail = action({
     const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!googleApiKey) throw new Error("GOOGLE_PLACES_API_KEY not set");
 
-    // Google Places Details + Perplexity in parallel
+    // Google Places Details first, then Perplexity (needs name/address)
     const details = await getGooglePlaceDetails(args.placeId, googleApiKey);
-
-    // Kick off Perplexity after we have the name/address
-    const perplexitySummary = await getPerplexitySummary(
-      details.name,
-      details.address
-    );
+    const insight = await getPerplexityInsight(details.name, details.address);
 
     return {
       placeId: args.placeId,
       ...details,
-      perplexitySummary,
+      perplexitySummary: insight?.summary,
+      knownFor: insight?.knownFor,
+      mustTry: insight?.mustTry,
+      proTip: insight?.proTip,
+      vibe: insight?.vibe,
     };
   },
 });

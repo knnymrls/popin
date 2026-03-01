@@ -17,6 +17,7 @@ final class ProfileViewModel {
     var name = ""
     var phoneNumber = ""
     var avatarEmoji = "😊"
+    var profileImageUrl = ""
     var budget: String?
     var vibes: [String] = []
     var foodLoves: [String] = []
@@ -85,19 +86,21 @@ final class ProfileViewModel {
                 let dealbreakersEnc: [ConvexEncodable?] = dealbreakers.map { $0 }
 
                 let trimmedPhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
-                let args: [String: ConvexEncodable?] = [
+                var args: [String: ConvexEncodable?] = [
                     "userId": userId,
                     "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "phoneNumber": trimmedPhone.isEmpty ? nil : trimmedPhone,
                     "avatarEmoji": avatarEmoji,
-                    "budget": budget,
                     "vibes": vibesEnc,
                     "foodLoves": foodLovesEnc,
                     "foodAvoids": foodAvoidsEnc,
                     "activities": activitiesEnc,
                     "dealbreakers": dealbreakersEnc,
-                    "notes": notes.isEmpty ? nil : notes,
                 ]
+                // Only include optional fields when non-nil (Convex rejects null for v.optional)
+                if !trimmedPhone.isEmpty { args["phoneNumber"] = trimmedPhone }
+                if let budget { args["budget"] = budget }
+                if !notes.isEmpty { args["notes"] = notes }
+                if !profileImageUrl.isEmpty { args["profileImageUrl"] = profileImageUrl }
                 try await convex.mutation("profiles:upsert", with: args)
                 hasInitialized = false // Let subscription refresh
             } catch {
@@ -106,6 +109,28 @@ final class ProfileViewModel {
 
             isSaving = false
             isEditing = false
+        }
+    }
+
+    // MARK: - Seed
+
+    func seedProfile(userId: String, name: String, preset: String) {
+        isSaving = true
+        Task {
+            do {
+                let args: [String: ConvexEncodable?] = [
+                    "userId": userId,
+                    "name": name,
+                    "preset": preset,
+                ]
+                let _: SeedResult = try await convex.mutation(
+                    "profiles:seedProfile",
+                    with: args
+                )
+            } catch {
+                print("Seed profile failed: \(error)")
+            }
+            isSaving = false
         }
     }
 
@@ -141,6 +166,7 @@ final class ProfileViewModel {
         name = profile.name
         phoneNumber = profile.phoneNumber ?? ""
         avatarEmoji = profile.avatarEmoji ?? "😊"
+        profileImageUrl = profile.profileImageUrl ?? ""
         budget = profile.budget
         vibes = profile.vibes
         foodLoves = profile.foodLoves
@@ -154,6 +180,7 @@ final class ProfileViewModel {
         name = ""
         phoneNumber = ""
         avatarEmoji = "😊"
+        profileImageUrl = ""
         budget = nil
         vibes = []
         foodLoves = []

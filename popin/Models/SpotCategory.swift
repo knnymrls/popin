@@ -12,16 +12,16 @@ enum SpotCategory: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var icon: String {
+    var emoji: String {
         switch self {
-        case .restaurant: "fork.knife"
-        case .cafe: "cup.and.saucer"
-        case .bar: "wineglass"
-        case .coffee: "mug"
-        case .dessert: "birthday.cake"
-        case .shop: "bag"
-        case .outdoors: "leaf"
-        case .nightlife: "moon.stars"
+        case .restaurant: "\u{1F37D}\u{FE0F}"
+        case .cafe: "\u{2615}"
+        case .bar: "\u{1F378}"
+        case .coffee: "\u{2615}"
+        case .dessert: "\u{1F370}"
+        case .shop: "\u{1F6CD}\u{FE0F}"
+        case .outdoors: "\u{1F333}"
+        case .nightlife: "\u{1F3B6}"
         }
     }
 

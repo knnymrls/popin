@@ -5,33 +5,30 @@ struct CategoryChipsBar: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            GlassEffectContainer {
-                HStack(spacing: 8) {
-                    ForEach(SpotCategory.allCases) { category in
-                        let isSelected = selected == category
-                        Button {
-                            withAnimation(.snappy) {
-                                selected = isSelected ? nil : category
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: category.icon)
-                                    .font(.caption2)
-                                Text(category.rawValue)
-                                    .font(.caption.weight(.medium))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .foregroundStyle(isSelected ? .white : .primary)
-                            .glassEffect(
-                                isSelected ? .regular.tint(.blue) : .regular,
-                                in: .capsule
-                            )
+            HStack(spacing: 6) {
+                ForEach(SpotCategory.allCases) { category in
+                    let isSelected = selected == category
+                    Button {
+                        withAnimation(.snappy) {
+                            selected = isSelected ? nil : category
                         }
-                        .buttonStyle(.plain)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(category.emoji)
+                                .font(.subheadline)
+                            Text(category.rawValue)
+                                .font(.subheadline.weight(.medium))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .foregroundStyle(isSelected ? .white : .primary)
+                        .glassEffect(
+                            isSelected ? .regular.tint(.blue) : .regular,
+                            in: .capsule
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 16)
             }
         }
     }

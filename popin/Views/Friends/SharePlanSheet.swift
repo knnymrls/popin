@@ -15,6 +15,7 @@ struct SharePlanSheet: View {
     @State private var isLoading = true
     @State private var isSending = false
     @State private var didSend = false
+    @State private var cancellables = Set<AnyCancellable>()
     @Environment(\.dismiss) private var dismiss
 
     enum ShareMode: String, CaseIterable {
@@ -150,8 +151,11 @@ struct SharePlanSheet: View {
                     }
                 } label: {
                     HStack(spacing: 12) {
-                        Text(friend.displayEmoji)
-                            .font(.title3)
+                        AvatarView(
+                            imageUrl: friend.profileImageUrl,
+                            emoji: friend.displayEmoji,
+                            size: 32
+                        )
 
                         Text(friend.name)
                             .font(.subheadline)
@@ -271,22 +275,26 @@ struct SharePlanSheet: View {
     // MARK: - Logic
 
     private func loadPlans() {
-        Task {
-            do {
-                let args: [String: ConvexEncodable?] = ["userId": userId]
-                let userPlans: [Plan] = try await convex.query(
-                    "plans:getByUser",
-                    with: args
-                )
-                await MainActor.run {
-                    self.plans = userPlans
+        let args: [String: ConvexEncodable?] = ["userId": userId]
+        let publisher: AnyPublisher<[Plan], ClientError> = convex.subscribe(
+            to: "plans:getByUser",
+            with: args
+        )
+        publisher
+            .first()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        print("Failed to load plans: \(error)")
+                    }
                     self.isLoading = false
+                },
+                receiveValue: { userPlans in
+                    self.plans = userPlans
                 }
-            } catch {
-                await MainActor.run { self.isLoading = false }
-                print("Failed to load plans: \(error)")
-            }
-        }
+            )
+            .store(in: &cancellables)
     }
 
     private func sendPlan() {

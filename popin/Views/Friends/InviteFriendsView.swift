@@ -133,8 +133,11 @@ struct InviteFriendsView: View {
                 Section("On PopIn") {
                     ForEach(filteredMatched) { contact in
                         HStack(spacing: 12) {
-                            Text(contact.displayEmoji)
-                                .font(.title2)
+                            AvatarView(
+                                imageUrl: contact.profileImageUrl,
+                                emoji: contact.displayEmoji,
+                                size: 36
+                            )
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(contact.name)

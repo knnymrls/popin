@@ -12,6 +12,7 @@ struct SharedPlanItem: Decodable, Identifiable {
     @ConvexFloat var createdAt: Double
     let senderName: String?
     let senderEmoji: String?
+    let senderImageUrl: String?
     let planTitle: String?
     let planSummary: String?
 
@@ -34,6 +35,7 @@ struct FriendProfileDetail: Decodable, Identifiable {
     let userId: String
     let name: String
     let avatarEmoji: String?
+    let profileImageUrl: String?
     let budget: String?
     let vibes: [String]
     let foodLoves: [String]
@@ -69,6 +71,7 @@ struct MatchedContact: Decodable, Identifiable {
     let name: String
     let phoneNumber: String
     let avatarEmoji: String?
+    let profileImageUrl: String?
 
     var id: String { userId }
     var displayEmoji: String { avatarEmoji ?? "👤" }

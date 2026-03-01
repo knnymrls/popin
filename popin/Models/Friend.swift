@@ -7,6 +7,7 @@ struct Friend: Decodable, Identifiable {
     let userId: String
     let name: String
     let avatarEmoji: String?
+    let profileImageUrl: String?
     let budget: String?
     let vibes: [String]
     let foodLoves: [String]

@@ -1,91 +1,131 @@
 import SwiftUI
 
+private let accentBlue = Color(red: 0, green: 0.39, blue: 1)
+
 struct FriendRequestsView: View {
     let viewModel: FriendsViewModel
     let userId: String
 
     var body: some View {
-        List {
-            if !viewModel.incomingRequests.isEmpty {
-                Section("Incoming Requests") {
-                    ForEach(viewModel.incomingRequests) { request in
-                        HStack(spacing: 12) {
-                            Text(request.displayEmoji)
-                                .font(.title2)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(request.displayName)
-                                    .font(.subheadline.weight(.semibold))
-                                Text("Wants to be friends")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Button {
-                                viewModel.acceptRequest(request.id, userId: userId)
-                            } label: {
-                                Text("Accept")
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(.orange)
-                                    .foregroundStyle(.white)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-
-                            Button {
-                                viewModel.declineRequest(request.id, userId: userId)
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(8)
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-
-            if !viewModel.outgoingRequests.isEmpty {
-                Section("Sent Requests") {
-                    ForEach(viewModel.outgoingRequests) { request in
-                        HStack(spacing: 12) {
-                            Text(request.displayEmoji)
-                                .font(.title2)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(request.displayName)
-                                    .font(.subheadline.weight(.semibold))
-                                Text("Pending")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "clock")
+        ScrollView {
+            VStack(spacing: 16) {
+                if !viewModel.incomingRequests.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "envelope.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(accentBlue)
+                            Text("incoming")
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 4)
+                        .padding(.leading, 4)
+
+                        ForEach(viewModel.incomingRequests) { request in
+                            HStack(spacing: 12) {
+                                AvatarView(
+                                    imageUrl: request.requesterImageUrl,
+                                    emoji: request.displayEmoji,
+                                    size: 40
+                                )
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(request.displayName)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("wants to be friends")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    viewModel.acceptRequest(request.id, userId: userId)
+                                } label: {
+                                    Text("accept")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 7)
+                                        .background(accentBlue, in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    viewModel.declineRequest(request.id, userId: userId)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 28, height: 28)
+                                        .background(.ultraThinMaterial, in: Circle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(12)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                        }
                     }
                 }
-            }
 
-            if viewModel.incomingRequests.isEmpty && viewModel.outgoingRequests.isEmpty {
-                ContentUnavailableView(
-                    "No Requests",
-                    systemImage: "person.badge.clock",
-                    description: Text("No pending friend requests")
-                )
+                if !viewModel.outgoingRequests.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(accentBlue)
+                            Text("sent")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.leading, 4)
+
+                        ForEach(viewModel.outgoingRequests) { request in
+                            HStack(spacing: 12) {
+                                AvatarView(
+                                    imageUrl: request.addresseeImageUrl,
+                                    emoji: request.displayEmoji,
+                                    size: 40
+                                )
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(request.displayName)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("pending")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "clock")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(12)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                }
+
+                if viewModel.incomingRequests.isEmpty && viewModel.outgoingRequests.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "person.badge.clock")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("no pending requests")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 60)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
-        .navigationTitle("Friend Requests")
+        .navigationTitle("Requests")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

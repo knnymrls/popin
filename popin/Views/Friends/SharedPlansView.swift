@@ -1,151 +1,183 @@
 import SwiftUI
 
+private let accentBlue = Color(red: 0, green: 0.39, blue: 1)
+
 struct SharedPlansView: View {
     let viewModel: FriendsViewModel
     let userId: String
 
     var body: some View {
-        List {
-            // Pending hangout invites
-            let pendingHangouts = viewModel.sharedPlans.filter { $0.isHangout && $0.isPending }
-            if !pendingHangouts.isEmpty {
-                Section("Hangout Invites") {
-                    ForEach(pendingHangouts) { item in
-                        SharedPlanRow(item: item) {
-                            HStack(spacing: 8) {
-                                Button {
-                                    viewModel.respondToSharedPlan(item.id, userId: userId, accept: true)
-                                } label: {
-                                    Text("I'm in!")
-                                        .font(.caption.weight(.semibold))
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 6)
-                                        .background(.orange)
-                                        .foregroundStyle(.white)
-                                        .clipShape(Capsule())
-                                }
-                                .buttonStyle(.plain)
+        ScrollView {
+            VStack(spacing: 16) {
+                // Pending hangout invites
+                let pendingHangouts = viewModel.sharedPlans.filter { $0.isHangout && $0.isPending }
+                if !pendingHangouts.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionHeader(icon: "envelope.fill", title: "invites")
 
-                                Button {
-                                    viewModel.respondToSharedPlan(item.id, userId: userId, accept: false)
-                                } label: {
-                                    Text("Pass")
-                                        .font(.caption.weight(.medium))
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 6)
-                                        .background(.secondary.opacity(0.15))
-                                        .clipShape(Capsule())
+                        ForEach(pendingHangouts) { item in
+                            planCard(item: item) {
+                                HStack(spacing: 8) {
+                                    Button {
+                                        viewModel.respondToSharedPlan(item.id, userId: userId, accept: true)
+                                    } label: {
+                                        Text("i'm in")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 7)
+                                            .background(accentBlue, in: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        viewModel.respondToSharedPlan(item.id, userId: userId, accept: false)
+                                    } label: {
+                                        Text("pass")
+                                            .font(.caption.weight(.medium))
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 7)
+                                            .background(.ultraThinMaterial, in: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
                 }
-            }
 
-            // Accepted hangouts
-            let acceptedHangouts = viewModel.sharedPlans.filter { $0.isHangout && $0.rsvp == "accepted" }
-            if !acceptedHangouts.isEmpty {
-                Section("Upcoming Hangouts") {
-                    ForEach(acceptedHangouts) { item in
-                        SharedPlanRow(item: item) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text("You're going")
-                                    .font(.caption)
-                                    .foregroundStyle(.green)
+                // Accepted hangouts
+                let acceptedHangouts = viewModel.sharedPlans.filter { $0.isHangout && $0.rsvp == "accepted" }
+                if !acceptedHangouts.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionHeader(icon: "calendar", title: "upcoming")
+
+                        ForEach(acceptedHangouts) { item in
+                            planCard(item: item) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.green)
+                                    Text("you're going")
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundStyle(.green)
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Recommendations
-            let recommendations = viewModel.sharedPlans.filter { $0.isRecommendation }
-            if !recommendations.isEmpty {
-                Section("Recommendations") {
-                    ForEach(recommendations) { item in
-                        SharedPlanRow(item: item) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "hand.thumbsup")
-                                    .foregroundStyle(.blue)
-                                Text("Shared spot")
-                                    .font(.caption)
+                // Recommendations
+                let recommendations = viewModel.sharedPlans.filter { $0.isRecommendation }
+                if !recommendations.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionHeader(icon: "hand.thumbsup.fill", title: "recommendations")
+
+                        ForEach(recommendations) { item in
+                            planCard(item: item) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "sparkles")
+                                        .font(.caption2)
+                                        .foregroundStyle(accentBlue)
+                                    Text("shared spot")
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Declined
+                let declined = viewModel.sharedPlans.filter { $0.rsvp == "declined" }
+                if !declined.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionHeader(icon: "xmark.circle", title: "declined")
+
+                        ForEach(declined) { item in
+                            planCard(item: item) {
+                                Text("declined")
+                                    .font(.caption2.weight(.medium))
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
                 }
-            }
 
-            // Declined
-            let declined = viewModel.sharedPlans.filter { $0.rsvp == "declined" }
-            if !declined.isEmpty {
-                Section("Declined") {
-                    ForEach(declined) { item in
-                        SharedPlanRow(item: item) {
-                            Text("Declined")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                if viewModel.sharedPlans.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "map")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.tertiary)
+                        Text("no shared plans yet")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 60)
                 }
             }
-
-            if viewModel.sharedPlans.isEmpty {
-                ContentUnavailableView(
-                    "No Shared Plans",
-                    systemImage: "map",
-                    description: Text("When friends share plans with you, they'll appear here")
-                )
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
-        .navigationTitle("Shared Plans")
+        .navigationTitle("Plans")
+        .navigationBarTitleDisplayMode(.inline)
     }
-}
 
-// MARK: - Shared Plan Row
+    // MARK: - Helpers
 
-private struct SharedPlanRow<Actions: View>: View {
-    let item: SharedPlanItem
-    @ViewBuilder let actions: () -> Actions
+    private func sectionHeader(icon: String, title: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(accentBlue)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.leading, 4)
+    }
 
-    var body: some View {
+    private func planCard<Actions: View>(item: SharedPlanItem, @ViewBuilder actions: () -> Actions) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(item.displaySenderEmoji)
-                    .font(.title3)
+            HStack(spacing: 10) {
+                AvatarView(
+                    imageUrl: item.senderImageUrl,
+                    emoji: item.displaySenderEmoji,
+                    size: 36
+                )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Text(item.displaySenderName)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.caption.weight(.semibold))
                         Text(item.typeLabel)
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
 
                     Text(item.planTitle ?? "Untitled Plan")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
+                        .font(.subheadline.weight(.semibold))
                 }
+
+                Spacer()
             }
 
             if let summary = item.planSummary, !summary.isEmpty {
                 Text(summary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(3)
+                    .lineLimit(2)
             }
 
             if let message = item.message, !message.isEmpty {
                 HStack(spacing: 6) {
                     Image(systemName: "quote.opening")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(accentBlue)
                     Text(message)
-                        .font(.caption)
+                        .font(.caption2)
                         .italic()
                         .foregroundStyle(.secondary)
                 }
@@ -153,6 +185,7 @@ private struct SharedPlanRow<Actions: View>: View {
 
             actions()
         }
-        .padding(.vertical, 4)
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
     }
 }

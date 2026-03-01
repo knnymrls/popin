@@ -16,6 +16,8 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
     var messages: [ChatMessage] = []
     var chatInput = ""
     var isSending = false
+    var mentionedFriends: [Friend] = []
+    var hasGreeted = false
 
     // MARK: - Spot Detail State
 
@@ -27,6 +29,7 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
     // MARK: - Map State
 
     var nearbySpots: [SpotData] = []
+    var planMapSpots: [SpotData] = []
     var isLoadingNearby = false
 
     // MARK: - Search State
@@ -51,12 +54,21 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
         // Merge nearby + chat, dedup by placeId
         var seen = Set<String>()
         var result: [SpotData] = []
-        for spot in chatSpots + nearbySpots {
+        for spot in chatSpots + nearbySpots + planMapSpots {
             if seen.contains(spot.placeId) { continue }
             seen.insert(spot.placeId)
             result.append(spot)
         }
         return result
+    }
+
+    /// Top-rated spots that are "popping" — shown in the floating card
+    var poppingSpots: [SpotData] {
+        spots
+            .filter { ($0.rating ?? 0) >= 4.3 }
+            .sorted { ($0.rating ?? 0) > ($1.rating ?? 0) }
+            .prefix(5)
+            .map { $0 }
     }
 
     // MARK: - Private
@@ -70,10 +82,22 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
         completer.resultTypes = [.address, .pointOfInterest]
     }
 
+    // MARK: - Mentions
+
+    func addMention(_ friend: Friend) {
+        guard !mentionedFriends.contains(where: { $0.userId == friend.userId }) else { return }
+        mentionedFriends.append(friend)
+    }
+
+    func removeMention(_ friend: Friend) {
+        mentionedFriends.removeAll { $0.userId == friend.userId }
+    }
+
     // MARK: - Chat
 
     func sendGreeting(userId: String?, latitude: Double, longitude: Double) {
-        guard messages.isEmpty else { return }
+        guard !hasGreeted else { return }
+        hasGreeted = true
 
         let greetingPrompt = "what's popping right now? search for what's open and good nearby and give me your top pick."
 
@@ -102,8 +126,25 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
         chatInput = ""
 
         let loadingId = UUID()
-        messages.append(.loading(id: loadingId, stage: "Thinking..."))
+        messages.append(.loading(id: loadingId, stage: "Searching nearby..."))
         isSending = true
+
+        // Progressive loading stages
+        let stages = ["Checking what's open...", "Picking the best spots...", "Almost done..."]
+        var stageIndex = 0
+        let loadingTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] timer in
+            guard let self, self.isSending, stageIndex < stages.count else {
+                timer.invalidate()
+                return
+            }
+            if let idx = self.messages.firstIndex(where: {
+                if case .loading(let id, _) = $0 { return id == loadingId }
+                return false
+            }) {
+                self.messages[idx] = .loading(id: loadingId, stage: stages[stageIndex])
+            }
+            stageIndex += 1
+        }
 
         // Build messages array for Convex (text-only conversation history)
         var convexMessages: [ConvexEncodable?] = []
@@ -120,6 +161,17 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
             }
         }
 
+        // Always include current message (needed when showUserMessage is false, e.g. greeting)
+        if !showUserMessage {
+            let dict: [String: ConvexEncodable?] = ["role": "user", "content": trimmed]
+            convexMessages.append(dict)
+        }
+
+        // Capture mentioned friend IDs and clear
+        let friendIds: [ConvexEncodable?] = mentionedFriends.map { $0.userId as ConvexEncodable? }
+        let hasMentions = !mentionedFriends.isEmpty
+        mentionedFriends.removeAll()
+
         chatTask?.cancel()
         chatTask = Task {
             do {
@@ -129,6 +181,9 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
                     "longitude": longitude,
                 ]
                 args["userId"] = userId
+                if hasMentions {
+                    args["friendIds"] = friendIds
+                }
 
                 let response: ChatResponse = try await convex.action(
                     "ai:chat",
@@ -141,21 +196,34 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
                     return false
                 }
 
-                // Append spots if present
-                if let spotData = response.spots, !spotData.isEmpty {
-                    messages.append(.spots(spots: spotData))
-                    zoomToFitSpots()
-                }
-
                 // Append plan if present
+                let hasPlan = response.plan != nil
                 if let planData = response.plan {
                     messages.append(.plan(plan: planData))
                 }
 
-                // Append assistant text
-                if !response.text.isEmpty {
-                    messages.append(.assistant(text: response.text))
+                // Append spots for map + chat cards (skip cards when a plan exists)
+                if let spotData = response.spots, !spotData.isEmpty {
+                    if hasPlan {
+                        // Add to map only — don't show as chat cards
+                        planMapSpots = spotData
+                    } else {
+                        messages.append(.spots(spots: spotData))
+                    }
+                    zoomToFitSpots()
                 }
+
+                // Append assistant text (strip markdown since chat is plain text)
+                if !response.text.isEmpty {
+                    let cleanText = response.text
+                        .replacingOccurrences(of: "**", with: "")
+                        .replacingOccurrences(of: "__", with: "")
+                        .replacingOccurrences(of: "~~", with: "")
+                    messages.append(.assistant(text: cleanText))
+                }
+
+                // Add follow-up suggestions after AI responds
+                appendSuggestionsIfNeeded()
             } catch is CancellationError {
                 messages.removeAll { msg in
                     if case .loading(let id, _) = msg { return id == loadingId }
@@ -170,22 +238,67 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
                 messages.append(.assistant(text: "Something went wrong. Try again."))
             }
 
+            loadingTimer.invalidate()
             isSending = false
         }
     }
 
+    private func appendSuggestionsIfNeeded() {
+        // Remove any existing suggestion chips
+        messages.removeAll { msg in
+            if case .suggestions = msg { return true }
+            return false
+        }
+
+        // Check what the latest AI response included
+        let hasSpots = messages.contains { if case .spots = $0 { return true }; return false }
+        let hasPlan = messages.contains { if case .plan = $0 { return true }; return false }
+
+        var suggestions: [String] = []
+        if hasPlan {
+            suggestions = ["swap a stop", "make it cheaper", "add drinks"]
+        } else if hasSpots {
+            suggestions = ["plan it out", "something cheaper", "different vibe"]
+        } else {
+            // AI is asking a question — don't show chips, let user type their answer
+            return
+        }
+
+        messages.append(.suggestions(suggestions: suggestions))
+    }
+
     // MARK: - Nearby Spots
 
+    private var lastLoadedCategory: SpotCategory?
+    private var lastCoordinate: (lat: Double, lng: Double)?
+
     func loadNearbySpots(latitude: Double, longitude: Double) {
-        guard nearbySpots.isEmpty, !isLoadingNearby else { return }
+        lastCoordinate = (latitude, longitude)
+        // Skip if already loaded this category
+        guard lastLoadedCategory != selectedCategory || nearbySpots.isEmpty else { return }
+        fetchNearbySpots(latitude: latitude, longitude: longitude, category: selectedCategory)
+    }
+
+    func filterByCategory(_ category: SpotCategory?) {
+        selectedCategory = category
+        guard let coord = lastCoordinate else { return }
+        fetchNearbySpots(latitude: coord.lat, longitude: coord.lng, category: category)
+    }
+
+    private func fetchNearbySpots(latitude: Double, longitude: Double, category: SpotCategory?) {
+        guard !isLoadingNearby else { return }
         isLoadingNearby = true
+        lastLoadedCategory = category
 
         Task {
             do {
-                let args: [String: ConvexEncodable?] = [
+                var args: [String: ConvexEncodable?] = [
                     "latitude": latitude,
                     "longitude": longitude,
                 ]
+                if let category {
+                    args["type"] = category.googlePlaceType
+                }
                 let spots: [SpotData] = try await convex.action(
                     "ai:getNearbySpots",
                     with: args
@@ -250,6 +363,13 @@ final class ExploreViewModel: NSObject, MKLocalSearchCompleterDelegate {
         selectedSpot = spot
         spotDetail = nil
         isLoadingDetail = true
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            cameraPosition = .region(MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: spot.latitude, longitude: spot.longitude),
+                span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
+            ))
+        }
 
         Task {
             do {

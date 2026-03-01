@@ -33,7 +33,6 @@ struct ExploreMapView: View {
             }
         }
         .mapControls {
-            MapUserLocationButton()
             MapCompass()
             MapScaleView()
         }

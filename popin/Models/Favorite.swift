@@ -6,6 +6,7 @@ struct Favorite: Decodable, Identifiable {
     let userId: String
     let name: String
     let address: String
+    let photoUrl: String?
     @OptionalConvexFloat var priceLevel: Double?
     @OptionalConvexFloat var rating: Double?
     let types: [String]

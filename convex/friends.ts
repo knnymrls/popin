@@ -42,6 +42,7 @@ export const getFriends = query({
           userId: profile.userId,
           name: profile.name,
           avatarEmoji: profile.avatarEmoji ?? null,
+          profileImageUrl: profile.profileImageUrl ?? null,
           budget: profile.budget ?? null,
           vibes: profile.vibes,
           foodLoves: profile.foodLoves,
@@ -83,6 +84,7 @@ export const getPendingRequests = query({
           createdAt: f.createdAt,
           requesterName: profile?.name ?? "Unknown",
           requesterEmoji: profile?.avatarEmoji ?? null,
+          requesterImageUrl: profile?.profileImageUrl ?? null,
         };
       })
     );
@@ -117,6 +119,7 @@ export const getOutgoingRequests = query({
           createdAt: f.createdAt,
           addresseeName: profile?.name ?? "Unknown",
           addresseeEmoji: profile?.avatarEmoji ?? null,
+          addresseeImageUrl: profile?.profileImageUrl ?? null,
         };
       })
     );
@@ -153,6 +156,7 @@ export const getSharedPlans = query({
           createdAt: sp.createdAt,
           senderName: senderProfile?.name ?? "Unknown",
           senderEmoji: senderProfile?.avatarEmoji ?? null,
+          senderImageUrl: senderProfile?.profileImageUrl ?? null,
           planTitle: plan?.title ?? "Untitled",
           planSummary: plan?.aiSummary ?? "",
         };
@@ -508,6 +512,7 @@ export const matchContacts = mutation({
       name: string;
       phoneNumber: string;
       avatarEmoji: string | null;
+      profileImageUrl: string | null;
     }> = [];
     const unmatched: string[] = [];
 
@@ -523,6 +528,7 @@ export const matchContacts = mutation({
           name: profile.name,
           phoneNumber: phone,
           avatarEmoji: profile.avatarEmoji ?? null,
+          profileImageUrl: profile.profileImageUrl ?? null,
         });
       } else if (!profile) {
         unmatched.push(phone);
@@ -543,6 +549,7 @@ export const seedMockFriends = mutation({
         name: "Maya Chen",
         phoneNumber: "+15551000001",
         avatarEmoji: "🎨",
+        profileImageUrl: "https://i.pravatar.cc/200?u=maya_chen",
         budget: "moderate",
         vibes: ["chill", "cozy", "hipster"],
         foodLoves: ["ramen", "coffee", "brunch"],
@@ -556,6 +563,7 @@ export const seedMockFriends = mutation({
         name: "Jordan Reeves",
         phoneNumber: "+15551000002",
         avatarEmoji: "🏀",
+        profileImageUrl: "https://i.pravatar.cc/200?u=jordan_reeves",
         budget: "cheap",
         vibes: ["adventurous", "lively", "casual"],
         foodLoves: ["tacos", "bbq", "wings"],
@@ -569,6 +577,7 @@ export const seedMockFriends = mutation({
         name: "Priya Patel",
         phoneNumber: "+15551000003",
         avatarEmoji: "✨",
+        profileImageUrl: "https://i.pravatar.cc/200?u=priya_patel",
         budget: "splurge",
         vibes: ["trendy", "bougie", "romantic"],
         foodLoves: ["sushi", "mediterranean", "brunch"],
@@ -582,6 +591,7 @@ export const seedMockFriends = mutation({
         name: "Alex Thompson",
         phoneNumber: "+15551000004",
         avatarEmoji: "🎸",
+        profileImageUrl: "https://i.pravatar.cc/200?u=alex_thompson",
         budget: "moderate",
         vibes: ["dive-y", "lowkey", "lively"],
         foodLoves: ["pizza", "thai", "korean"],
@@ -595,6 +605,7 @@ export const seedMockFriends = mutation({
         name: "Sofia Rodriguez",
         phoneNumber: "+15551000005",
         avatarEmoji: "🌻",
+        profileImageUrl: "https://i.pravatar.cc/200?u=sofia_rodriguez",
         budget: "cheap",
         vibes: ["casual", "chill", "adventurous"],
         foodLoves: ["mexican", "dessert", "coffee"],
@@ -608,6 +619,7 @@ export const seedMockFriends = mutation({
         name: "David Kim",
         phoneNumber: "+15551000006",
         avatarEmoji: "🍷",
+        profileImageUrl: "https://i.pravatar.cc/200?u=david_kim",
         budget: "splurge",
         vibes: ["upscale", "romantic", "trendy"],
         foodLoves: ["italian", "steak", "seafood"],
@@ -650,6 +662,7 @@ export const seedMockFriends = mutation({
       name: "Kai Nakamura",
       phoneNumber: "+15551000007",
       avatarEmoji: "🎯",
+      profileImageUrl: "https://i.pravatar.cc/200?u=kai_nakamura",
       budget: "moderate",
       vibes: ["adventurous", "trendy", "lively"],
       foodLoves: ["ramen", "sushi", "korean"],

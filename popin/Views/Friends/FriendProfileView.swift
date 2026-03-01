@@ -1,5 +1,7 @@
 import SwiftUI
 
+private let accentBlue = Color(red: 0, green: 0.39, blue: 1)
+
 struct FriendProfileView: View {
     let friend: Friend
     let userId: String
@@ -11,98 +13,67 @@ struct FriendProfileView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 16) {
                 // Header
-                VStack(spacing: 12) {
-                    Text(friend.displayEmoji)
-                        .font(.system(size: 72))
+                headerCard
 
-                    Text(friend.name)
-                        .font(.title.bold())
-
-                    HStack(spacing: 8) {
-                        Label(friend.budgetLabel, systemImage: "dollarsign.circle")
-                            .font(.caption.weight(.medium))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(.orange.opacity(0.15))
-                            .clipShape(Capsule())
-
-                        if !friend.vibes.isEmpty {
-                            Text(friend.topVibes)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                // Taste sections
+                if !friend.vibes.isEmpty {
+                    tasteSection(icon: "sparkles", title: "vibes", tags: friend.vibes)
                 }
-                .padding(.top)
 
-                // Taste Profile Sections
-                VStack(spacing: 16) {
-                    if !friend.foodLoves.isEmpty {
-                        tagSection(title: "Loves", icon: "heart.fill", tags: friend.foodLoves, color: .pink)
-                    }
+                if !friend.foodLoves.isEmpty {
+                    tasteSection(icon: "heart.fill", title: "loves", tags: friend.foodLoves)
+                }
 
-                    if !friend.foodAvoids.isEmpty {
-                        tagSection(title: "Avoids", icon: "xmark.circle", tags: friend.foodAvoids, color: .red)
-                    }
+                if !friend.foodAvoids.isEmpty {
+                    tasteSection(icon: "xmark.circle.fill", title: "avoids", tags: friend.foodAvoids)
+                }
 
-                    if !friend.vibes.isEmpty {
-                        tagSection(title: "Vibes", icon: "sparkles", tags: friend.vibes, color: .purple)
-                    }
+                if !friend.activities.isEmpty {
+                    tasteSection(icon: "figure.run", title: "activities", tags: friend.activities)
+                }
 
-                    if !friend.activities.isEmpty {
-                        tagSection(title: "Activities", icon: "figure.walk", tags: friend.activities, color: .blue)
-                    }
+                if !friend.dealbreakers.isEmpty {
+                    tasteSection(icon: "hand.raised.fill", title: "dealbreakers", tags: friend.dealbreakers)
+                }
 
-                    if !friend.dealbreakers.isEmpty {
-                        tagSection(title: "Dealbreakers", icon: "hand.raised", tags: friend.dealbreakers, color: .orange)
-                    }
-
-                    if let notes = friend.notes, !notes.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("Notes", systemImage: "note.text")
-                                .font(.subheadline.weight(.semibold))
-                            Text(notes)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
+                if let notes = friend.notes, !notes.isEmpty {
+                    notesCard(notes)
                 }
 
                 // Actions
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     Button {
                         showSharePlan = true
                     } label: {
-                        Label("Share a Plan", systemImage: "square.and.arrow.up")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.orange)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        HStack(spacing: 6) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.caption.weight(.semibold))
+                            Text("Share a Plan")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(accentBlue, in: RoundedRectangle(cornerRadius: 14))
                     }
+                    .buttonStyle(.plain)
 
-                    Button(role: .destructive) {
+                    Button {
                         showRemoveAlert = true
                     } label: {
-                        Label("Remove Friend", systemImage: "person.badge.minus")
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.red.opacity(0.1))
-                            .foregroundStyle(.red)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        Text("remove friend")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(.top, 4)
                 }
-                .padding(.top, 8)
+                .padding(.top, 4)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
         .navigationBarTitleDisplayMode(.inline)
         .alert("Remove Friend", isPresented: $showRemoveAlert) {
@@ -123,85 +94,97 @@ struct FriendProfileView: View {
         }
     }
 
-    // MARK: - Tag Section
+    // MARK: - Header Card
 
-    private func tagSection(title: String, icon: String, tags: [String], color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: icon)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(color)
+    private var headerCard: some View {
+        VStack(spacing: 14) {
+            AvatarView(
+                imageUrl: friend.profileImageUrl,
+                emoji: friend.displayEmoji,
+                size: 96
+            )
+
+            Text(friend.name)
+                .font(.title2.weight(.bold))
+
+            HStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(friend.budgetLabel)
+                        .font(.caption.weight(.medium))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(accentBlue.opacity(0.1), in: Capsule())
+                .foregroundStyle(accentBlue)
+
+                if !friend.vibes.isEmpty {
+                    Text(friend.topVibes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .padding(.horizontal, 16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    // MARK: - Taste Section
+
+    private func tasteSection(icon: String, title: String, tags: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(accentBlue)
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 4)
 
             FlowLayout(spacing: 6) {
                 ForEach(tags, id: \.self) { tag in
                     Text(tag)
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(color.opacity(0.1))
-                        .clipShape(Capsule())
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(.primary.opacity(0.06), lineWidth: 1)
+                        )
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-// MARK: - Flow Layout (wrapping tags)
-
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = layout(proposal: proposal, subviews: subviews)
-        return result.size
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = layout(proposal: proposal, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(
-                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                proposal: ProposedViewSize(result.sizes[index])
-            )
-        }
-    }
+    // MARK: - Notes Card
 
-    private func layout(proposal: ProposedViewSize, subviews: Subviews) -> LayoutResult {
-        let maxWidth = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var sizes: [CGSize] = []
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            sizes.append(size)
-
-            if x + size.width > maxWidth, x > 0 {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
+    private func notesCard(_ notes: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "quote.opening")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(accentBlue)
+                Text("notes")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
+            .padding(.leading, 4)
 
-            positions.append(CGPoint(x: x, y: y))
-            rowHeight = max(rowHeight, size.height)
-            x += size.width + spacing
+            Text(notes)
+                .font(.subheadline)
+                .foregroundStyle(.primary.opacity(0.7))
         }
-
-        return LayoutResult(
-            size: CGSize(width: maxWidth, height: y + rowHeight),
-            positions: positions,
-            sizes: sizes
-        )
-    }
-
-    struct LayoutResult {
-        let size: CGSize
-        let positions: [CGPoint]
-        let sizes: [CGSize]
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 }
