@@ -1,17 +1,15 @@
-//
-//  popinApp.swift
-//  popin
-//
-//  Created by Kenny Morales on 2/28/26.
-//
-
 import SwiftUI
 
 @main
 struct popinApp: App {
+    @State private var auth = AuthManager()
+    @State private var locationManager = LocationManager()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environment(auth)
+                .environment(locationManager)
         }
     }
 }

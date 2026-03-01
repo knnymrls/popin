@@ -1,7 +1,26 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 
 export const addToSearch = mutation({
+  args: {
+    searchId: v.id("searches"),
+    placeId: v.string(),
+    name: v.string(),
+    latitude: v.number(),
+    longitude: v.number(),
+    address: v.string(),
+    photoUrl: v.optional(v.string()),
+    rating: v.optional(v.number()),
+    priceLevel: v.optional(v.number()),
+    oneLiner: v.string(),
+    vibeTags: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("spots", args);
+  },
+});
+
+export const addToSearchInternal = internalMutation({
   args: {
     searchId: v.id("searches"),
     placeId: v.string(),
