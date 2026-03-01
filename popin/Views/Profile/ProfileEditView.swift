@@ -5,16 +5,77 @@ struct ProfileEditView: View {
     let userId: String
     @Environment(\.dismiss) private var dismiss
 
+    private let emojiOptions = [
+        "😊", "😎", "🤩", "🥳", "😋", "🤤", "🧑‍🍳", "👨‍🎤",
+        "🍕", "🍔", "🌮", "🍣", "🍜", "🍩", "🧋", "🍷",
+        "🎸", "🎨", "🏄", "🚴", "🎯", "🌶️", "🍦", "☕",
+        "🐶", "🐱", "🦊", "🐻", "🌸", "🔥",
+    ]
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
+                    // Emoji Avatar Picker
+                    VStack(spacing: 12) {
+                        Text(vm.avatarEmoji)
+                            .font(.system(size: 52))
+                            .frame(width: 80, height: 80)
+                            .background(
+                                Circle()
+                                    .fill(.orange.opacity(0.15))
+                            )
+
+                        Text("Pick your avatar")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 8), spacing: 8) {
+                            ForEach(emojiOptions, id: \.self) { emoji in
+                                Button {
+                                    vm.avatarEmoji = emoji
+                                } label: {
+                                    Text(emoji)
+                                        .font(.title2)
+                                        .frame(width: 40, height: 40)
+                                        .background(
+                                            vm.avatarEmoji == emoji
+                                                ? Color.orange.opacity(0.2)
+                                                : Color.clear
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .strokeBorder(
+                                                    vm.avatarEmoji == emoji ? Color.orange : .clear,
+                                                    lineWidth: 2
+                                                )
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+
                     // Name
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Name")
                             .font(.headline)
                         TextField("Your name", text: $vm.name)
                             .textFieldStyle(.roundedBorder)
+                    }
+
+                    // Phone Number
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Phone Number")
+                            .font(.headline)
+                        TextField("+1 (555) 123-4567", text: $vm.phoneNumber)
+                            .textFieldStyle(.roundedBorder)
+                            .keyboardType(.phonePad)
+                        Text("So friends can find you on PopIn")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     // Budget
@@ -130,12 +191,12 @@ private struct BudgetChip: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
-                .background(isSelected ? Color.blue.opacity(0.15) : Color(.systemGray6))
-                .foregroundStyle(isSelected ? .blue : .primary)
+                .background(isSelected ? Color.orange.opacity(0.15) : Color(.systemGray6))
+                .foregroundStyle(isSelected ? .orange : .primary)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(isSelected ? Color.blue.opacity(0.4) : .clear, lineWidth: 1.5)
+                        .strokeBorder(isSelected ? Color.orange.opacity(0.4) : .clear, lineWidth: 1.5)
                 )
         }
         .buttonStyle(.plain)

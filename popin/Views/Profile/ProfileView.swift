@@ -19,8 +19,12 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .toolbar {
                 if vm.hasProfile && !vm.isEditing {
-                    Button("Edit") {
+                    Button {
                         vm.beginEditing()
+                    } label: {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.orange)
                     }
                 }
             }
@@ -42,114 +46,139 @@ struct ProfileView: View {
 
     private var profileContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // Header
-                HStack(spacing: 14) {
-                    Circle()
-                        .fill(Color.blue.gradient)
-                        .frame(width: 60, height: 60)
-                        .overlay {
-                            Text(vm.profile?.name.prefix(1).uppercased() ?? "?")
-                                .font(.title.bold())
-                                .foregroundStyle(.white)
-                        }
+            VStack(spacing: 20) {
+                // Header Card
+                headerCard
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(vm.profile?.name ?? "")
-                            .font(.title2.bold())
-
-                        if let budget = vm.profile?.budget {
-                            Text(budgetLabel(budget))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                // Sections
+                // Taste Cards
                 if let profile = vm.profile {
                     if !profile.vibes.isEmpty {
-                        tagSection("Vibes", tags: profile.vibes, color: .purple)
+                        tasteCard(
+                            icon: "sparkles",
+                            title: "Vibes",
+                            tags: profile.vibes,
+                            color: .purple
+                        )
                     }
 
                     if !profile.foodLoves.isEmpty {
-                        tagSection("Food Loves", tags: profile.foodLoves, color: .orange)
+                        tasteCard(
+                            icon: "heart.fill",
+                            title: "Food Loves",
+                            tags: profile.foodLoves,
+                            color: .orange
+                        )
                     }
 
                     if !profile.foodAvoids.isEmpty {
-                        tagSection("Food Avoids", tags: profile.foodAvoids, color: .red)
+                        tasteCard(
+                            icon: "xmark.circle.fill",
+                            title: "Food Avoids",
+                            tags: profile.foodAvoids,
+                            color: .red
+                        )
                     }
 
                     if !profile.activities.isEmpty {
-                        tagSection("Activities", tags: profile.activities, color: .green)
+                        tasteCard(
+                            icon: "figure.run",
+                            title: "Activities",
+                            tags: profile.activities,
+                            color: .green
+                        )
                     }
 
                     if !profile.dealbreakers.isEmpty {
-                        tagSection("Dealbreakers", tags: profile.dealbreakers, color: .red)
+                        tasteCard(
+                            icon: "hand.raised.fill",
+                            title: "Dealbreakers",
+                            tags: profile.dealbreakers,
+                            color: .red.opacity(0.8)
+                        )
                     }
 
                     if let notes = profile.notes, !notes.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Notes")
-                                .font(.headline)
-                            Text(notes)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
+                        notesCard(notes)
                     }
                 }
 
-                // Sign out
+                // Sign Out
                 Button(role: .destructive) {
                     auth.signOut()
                 } label: {
-                    Text("Sign Out")
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: 6) {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Text("Sign Out")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
                 }
                 .buttonStyle(.bordered)
-                .padding(.top, 16)
+                .tint(.red)
+                .padding(.top, 4)
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
     }
 
-    // MARK: - Empty State
+    // MARK: - Header Card
 
-    private var emptyState: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 64))
-                .foregroundStyle(.blue)
+    private var headerCard: some View {
+        VStack(spacing: 14) {
+            // Emoji Avatar
+            Text(vm.profile?.displayEmoji ?? "😊")
+                .font(.system(size: 56))
+                .frame(width: 88, height: 88)
+                .background(
+                    Circle()
+                        .fill(.orange.opacity(0.15))
+                )
 
-            Text("Set up your taste profile")
+            // Name
+            Text(vm.profile?.name ?? "")
                 .font(.title2.bold())
 
-            Text("Tell us what you're into so we can give you better recommendations.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            // Budget + Phone
+            HStack(spacing: 10) {
+                if let budget = vm.profile?.budget {
+                    Label(budgetLabel(budget), systemImage: "dollarsign.circle.fill")
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(.green.opacity(0.12))
+                        .foregroundStyle(.green)
+                        .clipShape(Capsule())
+                }
 
-            Button {
-                vm.isEditing = true
-            } label: {
-                Text("Get Started")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                if let phone = vm.profile?.phoneNumber, !phone.isEmpty {
+                    Label(phone, systemImage: "phone.fill")
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(.blue.opacity(0.12))
+                        .foregroundStyle(.blue)
+                        .clipShape(Capsule())
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .padding(.horizontal, 48)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 
-    // MARK: - Helpers
+    // MARK: - Taste Card
 
-    private func tagSection(_ title: String, tags: [String], color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
+    private func tasteCard(icon: String, title: String, tags: [String], color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(color)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+            }
 
             FlowLayout(spacing: 8) {
                 ForEach(tags, id: \.self) { tag in
@@ -163,13 +192,71 @@ struct ProfileView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
+
+    // MARK: - Notes Card
+
+    private func notesCard(_ notes: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "note.text")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text("Notes")
+                    .font(.subheadline.weight(.semibold))
+            }
+
+            Text(notes)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Text("🍕")
+                .font(.system(size: 64))
+
+            Text("Build your taste profile")
+                .font(.title2.bold())
+
+            Text("Tell us what you love (and what to skip) so we can find your perfect spots.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+
+            Button {
+                vm.isEditing = true
+            } label: {
+                Text("Get Started")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+            .padding(.horizontal, 48)
+            .padding(.top, 8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Helpers
 
     private func budgetLabel(_ budget: String) -> String {
         switch budget {
-        case "cheap": return "Budget-friendly ($)"
-        case "moderate": return "Moderate ($$)"
-        case "splurge": return "Splurge ($$$)"
+        case "cheap": return "Budget-friendly"
+        case "moderate": return "Moderate"
+        case "splurge": return "Splurge"
         default: return budget
         }
     }

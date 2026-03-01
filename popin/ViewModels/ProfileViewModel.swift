@@ -15,6 +15,8 @@ final class ProfileViewModel {
     // MARK: - Editable Fields
 
     var name = ""
+    var phoneNumber = ""
+    var avatarEmoji = "😊"
     var budget: String?
     var vibes: [String] = []
     var foodLoves: [String] = []
@@ -82,9 +84,12 @@ final class ProfileViewModel {
                 let activitiesEnc: [ConvexEncodable?] = activities.map { $0 }
                 let dealbreakersEnc: [ConvexEncodable?] = dealbreakers.map { $0 }
 
+                let trimmedPhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
                 let args: [String: ConvexEncodable?] = [
                     "userId": userId,
                     "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
+                    "phoneNumber": trimmedPhone.isEmpty ? nil : trimmedPhone,
+                    "avatarEmoji": avatarEmoji,
                     "budget": budget,
                     "vibes": vibesEnc,
                     "foodLoves": foodLovesEnc,
@@ -134,6 +139,8 @@ final class ProfileViewModel {
 
     private func populateFields(from profile: TasteProfile) {
         name = profile.name
+        phoneNumber = profile.phoneNumber ?? ""
+        avatarEmoji = profile.avatarEmoji ?? "😊"
         budget = profile.budget
         vibes = profile.vibes
         foodLoves = profile.foodLoves
@@ -145,6 +152,8 @@ final class ProfileViewModel {
 
     private func resetFields() {
         name = ""
+        phoneNumber = ""
+        avatarEmoji = "😊"
         budget = nil
         vibes = []
         foodLoves = []
