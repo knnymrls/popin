@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  poppin
+//  popin
 //
 //  Created by Kenny Morales on 2/28/26.
 //
